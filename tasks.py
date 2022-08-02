@@ -14,14 +14,8 @@ except ImportError:
 from invoke import run, task
 from invoke.exceptions import Exit, UnexpectedExit
 
-all_binaries = set(["controller",
-                    "speaker",
-                    "mirror-server"])
-all_architectures = set(["amd64",
-                         "arm",
-                         "arm64",
-                         "ppc64le",
-                         "s390x"])
+all_binaries = {"controller", "speaker", "mirror-server"}
+all_architectures = {"amd64", "arm", "arm64", "ppc64le", "s390x"}
 
 def _check_architectures(architectures):
     out = set()
@@ -29,8 +23,8 @@ def _check_architectures(architectures):
         if arch == "all":
             out |= all_architectures
         elif arch not in all_architectures:
-            print("unknown architecture {}".format(arch))
-            print("Supported architectures: {}".format(", ".join(sorted(all_architectures))))
+            print(f"unknown architecture {arch}")
+            print(f'Supported architectures: {", ".join(sorted(all_architectures))}')
             sys.exit(1)
         else:
             out.add(arch)
@@ -44,8 +38,8 @@ def _check_binaries(binaries):
         if binary == "all":
             out |= all_binaries
         elif binary not in all_binaries:
-            print("Unknown binary {}".format(binary))
-            print("Known binaries: {}".format(", ".join(sorted(all_binaries))))
+            print(f"Unknown binary {binary}")
+            print(f'Known binaries: {", ".join(sorted(all_binaries))}')
             sys.exit(1)
         else:
             out.add(binary)
@@ -55,14 +49,16 @@ def _check_binaries(binaries):
     return list(sorted(out))
 
 def _docker_build_cmd():
-    cmd = os.getenv('DOCKER_BUILD_CMD')
-    if cmd:
-        out = cmd
-    else:
-        out = run("docker buildx ls >/dev/null"
-                  "&& echo 'docker buildx build --load' "
-                  "|| echo 'docker build'", hide=True).stdout.strip()
-    return out
+    return (
+        cmd
+        if (cmd := os.getenv('DOCKER_BUILD_CMD'))
+        else run(
+            "docker buildx ls >/dev/null"
+            "&& echo 'docker buildx build --load' "
+            "|| echo 'docker build'",
+            hide=True,
+        ).stdout.strip()
+    )
 
 def _make_build_dirs():
     for arch in all_architectures:
@@ -119,14 +115,7 @@ def _get_subnets_allocated_ips():
     return sorted(v4_ips), sorted(v6_ips)
 
 
-@task(iterable=["binaries", "architectures"],
-      help={
-          "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
-          "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
-          "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
-          "repo": "Docker repository under which to tag the images. Default 'metallb'.",
-          "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
-      })
+@task(iterable=["binaries", "architectures"], help={"binaries": f"""binaries to build. One or more of {", ".join(sorted(all_binaries))}, or 'all'""", "architectures": f"""architectures to build. One or more of {", ".join(sorted(all_architectures))}, or 'all'""", "registry": "Docker registry under which to tag the images. Default 'quay.io'.", "repo": "Docker repository under which to tag the images. Default 'metallb'.", "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'."})
 def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag="dev"):
     """Build MetalLB docker images."""
     binaries = _check_binaries(binaries)
@@ -182,14 +171,7 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
                 echo=True)
 
 
-@task(iterable=["binaries", "architectures"],
-      help={
-          "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
-          "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
-          "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
-          "repo": "Docker repository under which to tag the images. Default 'metallb'.",
-          "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
-      })
+@task(iterable=["binaries", "architectures"], help={"binaries": f"""binaries to build. One or more of {", ".join(sorted(all_binaries))}, or 'all'""", "architectures": f"""architectures to build. One or more of {", ".join(sorted(all_architectures))}, or 'all'""", "registry": "Docker registry under which to tag the images. Default 'quay.io'.", "repo": "Docker repository under which to tag the images. Default 'metallb'.", "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'."})
 def push(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag="dev"):
     """Build and push docker images to registry."""
     binaries = _check_binaries(binaries)
@@ -207,20 +189,14 @@ def push(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag="
                 echo=True)
 
 
-@task(iterable=["binaries"],
-      help={
-          "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
-          "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
-          "repo": "Docker repository under which to tag the images. Default 'metallb'.",
-          "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
-      })
+@task(iterable=["binaries"], help={"binaries": f"""binaries to build. One or more of {", ".join(sorted(all_binaries))}, or 'all'""", "registry": "Docker registry under which to tag the images. Default 'quay.io'.", "repo": "Docker repository under which to tag the images. Default 'metallb'.", "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'."})
 def push_multiarch(ctx, binaries, registry="quay.io", repo="metallb", tag="dev"):
     """Build and push multi-architecture docker images to registry."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(["all"])
     push(ctx, binaries=binaries, architectures=architectures, registry=registry, repo=repo, tag=tag)
 
-    platforms = ",".join("linux/{}".format(arch) for arch in architectures)
+    platforms = ",".join(f"linux/{arch}" for arch in architectures)
     for bin in binaries:
         run("manifest-tool push from-args "
             "--platforms {platforms} "
@@ -246,11 +222,11 @@ def validate_kind_version():
     except Exception as e:
         raise Exit(message="Could not determine kind version (is kind installed?)")
 
-    actual_version = re.search("v(\d*\.\d*\.\d*)", raw.stdout).group(1)
+    actual_version = re.search("v(\d*\.\d*\.\d*)", raw.stdout)[1]
     delta = semver.compare(actual_version, min_version)
 
     if delta < 0:
-        raise Exit(message="kind version >= {} required".format(min_version))
+        raise Exit(message=f"kind version >= {min_version} required")
 
 
 @task(help={
@@ -301,59 +277,80 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
         if ip_family != "ipv4":
             networking_config["ipFamily"] = ip_family
 
-        if len(networking_config) > 0:
+        if networking_config:
             config["networking"] = networking_config
 
-        extra_options = ""
-        if node_img != None:
-            extra_options = "--image={}".format(node_img)
+        extra_options = f"--image={node_img}" if node_img != None else ""
         config = yaml.dump(config).encode("utf-8")
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
-            run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
+            run(
+                f"kind create cluster --name={name} --config={tmp.name} {extra_options}",
+                pty=True,
+                echo=True,
+            )
+
 
     binaries = ["controller", "speaker", "mirror-server"]
     build(ctx, binaries, architectures=[architecture])
-    run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
+    run(
+        f"kind load docker-image --name={name} quay.io/metallb/controller:dev-{architecture}",
+        echo=True,
+    )
+
+    run(
+        f"kind load docker-image --name={name} quay.io/metallb/speaker:dev-{architecture}",
+        echo=True,
+    )
+
+    run(
+        f"kind load docker-image --name={name} quay.io/metallb/mirror-server:dev-{architecture}",
+        echo=True,
+    )
+
 
     if helm_install:
-        run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
-                "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={}".format(architecture,
-                architecture, "true" if bgp_type == "frr" else "false"), echo=True)
+        run(
+            f'helm install metallb charts/metallb/ --set controller.image.tag=dev-{architecture} --set speaker.image.tag=dev-{architecture} --set speaker.frr.enabled={"true" if bgp_type == "frr" else "false"}',
+            echo=True,
+        )
+
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
 
-        manifests_dir = os.getcwd() + "/manifests"
+        manifests_dir = f"{os.getcwd()}/manifests"
         with tempfile.TemporaryDirectory() as tmpdir:
             # Copy namespace manifest.
-            shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
+            shutil.copy(f"{manifests_dir}/namespace.yaml", tmpdir)
 
             # FIXME: This is a hack to get the correct manifest file.
             manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
             # open file and replace the protocol with the one specified by the user
-            with open(manifests_dir + "/" + manifest_filename) as f:
+            with open(f"{manifests_dir}/{manifest_filename}") as f:
                 manifest = f.read()
             for image in binaries:
-                manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
-                            "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
-                manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
-            with open(tmpdir + "/metallb.yaml", "w") as f:
+                manifest = re.sub(
+                    f"image: quay.io/metallb/{image}:.*",
+                    f"image: quay.io/metallb/{image}:dev-{architecture}",
+                    manifest,
+                )
+
+                manifest = re.sub("--log-level=info", f"--log-level={log_level}", manifest)
+            with open(f"{tmpdir}/metallb.yaml", "w") as f:
                 f.write(manifest)
                 f.flush()
 
-            run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
-            run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
+            run(f"kubectl apply -f {tmpdir}/namespace.yaml", echo=True)
+            run(f"kubectl apply -f {tmpdir}/metallb.yaml", echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
-    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+    manifest = manifest.replace(":main", f":dev-{architecture}")
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
-        run("kubectl apply -f {}".format(tmp.name), echo=True)
+        run(f"kubectl apply -f {tmp.name}", echo=True)
 
     if protocol == "bgp":
         print("Configuring MetalLB with a BGP test environment")
@@ -368,25 +365,25 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
 # Configure MetalLB in the dev-env for layer2 testing.
 # Identify the unused network address range from kind network and used it in configmap.
 def layer2_dev_env():
-    dev_env_dir = os.getcwd() + "/dev-env/layer2"
-    with open("%s/config.yaml.tmpl" % dev_env_dir, 'r') as f:
+    dev_env_dir = f"{os.getcwd()}/dev-env/layer2"
+    with open(f"{dev_env_dir}/config.yaml.tmpl", 'r') as f:
         layer2_config = "# THIS FILE IS AUTOGENERATED\n" + f.read()
     layer2_config = layer2_config.replace(
         "SERVICE_V4_RANGE", get_available_ips(4)[0])
     layer2_config = layer2_config.replace(
         "SERVICE_V6_RANGE", get_available_ips(6)[0])
-    with open("%s/config.yaml" % dev_env_dir, 'w') as f:
+    with open(f"{dev_env_dir}/config.yaml", 'w') as f:
         f.write(layer2_config)
     # Apply the MetalLB ConfigMap
-    run("kubectl apply -f %s/config.yaml" % dev_env_dir)
+    run(f"kubectl apply -f {dev_env_dir}/config.yaml")
 
 # Configure MetalLB in the dev-env for BGP testing. Start an frr based BGP
 # router in a container and configure MetalLB to peer with it.
 # See dev-env/bgp/README.md for some more information.
 def bgp_dev_env(ip_family, frr_volume_dir):
-    dev_env_dir = os.getcwd() + "/dev-env/bgp"
+    dev_env_dir = f"{os.getcwd()}/dev-env/bgp"
     if frr_volume_dir == "":
-        frr_volume_dir = dev_env_dir + "/frr-volume"
+        frr_volume_dir = f"{dev_env_dir}/frr-volume"
 
     # TODO -- The IP address handling will need updates to add support for IPv6
 
@@ -407,23 +404,21 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     except FileExistsError:
         pass
     except Exception as e:
-        raise Exit(message='Failed to create frr-volume directory: %s'
-                   % str(e))
+        raise Exit(message=f'Failed to create frr-volume directory: {str(e)}')
 
     # These config files are static, so we copy them straight in.
     copy_files = ('zebra.conf', 'daemons', 'vtysh.conf')
     for f in copy_files:
-        shutil.copyfile("%s/frr/%s" % (dev_env_dir, f),
-                        "%s/%s" % (frr_volume_dir, f))
+        shutil.copyfile(f"{dev_env_dir}/frr/{f}", f"{frr_volume_dir}/{f}")
 
     # bgpd.conf is created from a template so that we can include the current
     # Node IPs.
-    with open("%s/frr/bgpd.conf.tmpl" % dev_env_dir, 'r') as f:
+    with open(f"{dev_env_dir}/frr/bgpd.conf.tmpl", 'r') as f:
         bgpd_config = "! THIS FILE IS AUTOGENERATED\n" + f.read()
         bgpd_config = bgpd_config.replace("PROTOCOL", ip_family)
-    for n in range(0, len(node_ips)):
+    for n in range(len(node_ips)):
         bgpd_config = bgpd_config.replace("NODE%d_IP" % n, node_ips[n])
-    with open("%s/bgpd.conf" % frr_volume_dir, 'w') as f:
+    with open(f"{frr_volume_dir}/bgpd.conf", 'w') as f:
         f.write(bgpd_config)
 
     # Run a BGP router in a container for all of the speakers to peer with.
@@ -440,19 +435,19 @@ def bgp_dev_env(ip_family, frr_volume_dir):
         peer_address = run('docker inspect -f "{{ '
             'range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}" frr', echo=True)
     else:
-        raise Exit(message='Unsupported ip address family %s' % ip_family)
+        raise Exit(message=f'Unsupported ip address family {ip_family}')
 
-    with open("%s/config.yaml.tmpl" % dev_env_dir, 'r') as f:
+    with open(f"{dev_env_dir}/config.yaml.tmpl", 'r') as f:
         mlb_config = "# THIS FILE IS AUTOGENERATED\n" + f.read()
     mlb_config = mlb_config.replace("IP_PEER_ADDRESS", peer_address.stdout.strip())
-    with open("%s/config.yaml" % dev_env_dir, 'w') as f:
+    with open(f"{dev_env_dir}/config.yaml", 'w') as f:
         f.write(mlb_config)
     # Apply the MetalLB ConfigMap
-    run("kubectl apply -f %s/config.yaml" % dev_env_dir)
+    run(f"kubectl apply -f {dev_env_dir}/config.yaml")
 
 
 def get_available_ips(ip_family=None):
-    if ip_family is None or (ip_family != 4 and ip_family != 6):
+    if ip_family is None or ip_family not in [4, 6]:
         raise Exit(message="Please provide network version: 4 or 6.")
 
     v4, v6 = _get_subnets_allocated_ips()
@@ -464,7 +459,7 @@ def get_available_ips(ip_family=None):
             last_used = ipaddress.ip_interface(used_list[-1])
 
             for_containers = []
-            for i in range(2):
+            for _ in range(2):
                 last_used = last_used + 1
                 for_containers.append(str(last_used))
 
@@ -473,10 +468,16 @@ def get_available_ips(ip_family=None):
             service_ip_range_start = last_used + 1
             service_ip_range_end = last_used + 11
             if service_ip_range_start not in network:
-                raise Exit(message='network range %s is not in %s' % (service_ip_range_start, network))
+                raise Exit(
+                    message=f'network range {service_ip_range_start} is not in {network}'
+                )
+
             if service_ip_range_end not in network:
-                raise Exit(message='network range %s is not in %s' % (service_ip_range_end, network))
-            return '%s-%s' % (service_ip_range_start.ip, service_ip_range_end.ip), ','.join(for_containers)
+                raise Exit(message=f'network range {service_ip_range_end} is not in {network}')
+            return (
+                f'{service_ip_range_start.ip}-{service_ip_range_end.ip}',
+                ','.join(for_containers),
+            )
 
 @task(help={
     "name": "name of the kind cluster to delete.",
@@ -488,25 +489,25 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     validate_kind_version()
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
     if name in clusters:
-        run("kind delete cluster --name={}".format(name), hide=True)
+        run(f"kind delete cluster --name={name}", hide=True)
     else:
-        raise Exit(message="Unable to find cluster named: {}".format(name))
+        raise Exit(message=f"Unable to find cluster named: {name}")
 
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
         'done', hide=True)
 
     # cleanup bgp configs
-    dev_env_dir = os.getcwd() + "/dev-env/bgp"
+    dev_env_dir = f"{os.getcwd()}/dev-env/bgp"
     if frr_volume_dir == "":
-        frr_volume_dir = dev_env_dir + "/frr-volume"
+        frr_volume_dir = f"{dev_env_dir}/frr-volume"
 
     # sudo because past docker runs will have changed ownership of this dir
     run('sudo rm -rf "%s"' % frr_volume_dir)
     run('rm -f "%s"/config.yaml' % dev_env_dir)
 
     # cleanup layer2 configs
-    dev_env_dir = os.getcwd() + "/dev-env/layer2"
+    dev_env_dir = f"{os.getcwd()}/dev-env/layer2"
     run('rm -f "%s"/config.yaml' % dev_env_dir)
 
 
@@ -625,12 +626,19 @@ def lint(ctx, env="container"):
     golangci_cmd = "golangci-lint run --timeout 5m0s ./..."
 
     if env == "container":
-        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} {}".format(version, golangci_cmd), echo=True)
+        run(
+            f"docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{version} {golangci_cmd}",
+            echo=True,
+        )
+
     elif env == "host":
-        run("curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v{}".format(version))
+        run(
+            f"curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v{version}"
+        )
+
         run(golangci_cmd)
     else:
-        raise Exit(message="Unsupported linter environment: {}". format(env))
+        raise Exit(message=f"Unsupported linter environment: {env}")
 
 
 @task(help={
@@ -648,54 +656,52 @@ def lint(ctx, env="container"):
 })
 def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, use_operator=False):
     """Run E2E tests against development cluster."""
-    if skip_docker:
-        opt_skip_docker = "--skip-docker"
-    else:
-        opt_skip_docker = ""
-
-    ginkgo_skip = ""
-    if skip:
-        ginkgo_skip = "--ginkgo.skip=\"" + skip + "\""
-
-    opt_use_operator = ""
-    if use_operator:
-        opt_use_operator = "--use-operator"
-
-    ginkgo_focus = ""
-    if focus:
-        ginkgo_focus = "--ginkgo.focus=\"" + focus + "\""
-    
+    opt_skip_docker = "--skip-docker" if skip_docker else ""
+    ginkgo_skip = "--ginkgo.skip=\"" + skip + "\"" if skip else ""
+    opt_use_operator = "--use-operator" if use_operator else ""
+    ginkgo_focus = "--ginkgo.focus=\"" + focus + "\"" if focus else ""
     if kubeconfig is None:
         validate_kind_version()
         clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
-        if name in clusters:
-            kubeconfig_file = tempfile.NamedTemporaryFile()
-            kubeconfig = kubeconfig_file.name
-            run("kind export kubeconfig --name={} --kubeconfig={}".format(name, kubeconfig), pty=True, echo=True)
-        else:
-            raise Exit(message="Unable to find cluster named: {}".format(name))
+        if name not in clusters:
+            raise Exit(message=f"Unable to find cluster named: {name}")
+        kubeconfig_file = tempfile.NamedTemporaryFile()
+        kubeconfig = kubeconfig_file.name
+        run(
+            f"kind export kubeconfig --name={name} --kubeconfig={kubeconfig}",
+            pty=True,
+            echo=True,
+        )
+
     else:
         os.environ['KUBECONFIG'] = kubeconfig
 
     namespaces = system_namespaces.replace(' ', '').split(',')
     for ns in namespaces:
-        run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
+        run(
+            f"kubectl -n {ns} wait --for=condition=Ready --all pods --timeout 300s",
+            hide=True,
+        )
+
 
     ips_for_containers_v4 = ""
     if ipv4_service_range is None:
         ipv4_service_range, ips = get_available_ips(4)
-        ips_for_containers_v4 = "--ips-for-containers-v4=" + ips
+        ips_for_containers_v4 = f"--ips-for-containers-v4={ips}"
 
     ips_for_containers_v6 = ""
     if ipv6_service_range is None:
         ipv6_service_range, ips = get_available_ips(6)
-        ips_for_containers_v6 = "--ips-for-containers-v6=" + ips
+        ips_for_containers_v6 = f"--ips-for-containers-v6={ips}"
 
-    testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 1h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
+    testrun = run(
+        f"cd `git rev-parse --show-toplevel`/e2etest &&KUBECONFIG={kubeconfig} go test -timeout 1h {ginkgo_focus} {ginkgo_skip} --provider=local --kubeconfig={kubeconfig} --service-pod-port={service_pod_port} {ips_for_containers_v4} {ips_for_containers_v6} -ipv4-service-range={ipv4_service_range} -ipv6-service-range={ipv6_service_range} {opt_skip_docker} {opt_use_operator}",
+        warn="True",
+    )
+
 
     if export != None:
-        run("kind export logs {}".format(export))
+        run(f"kind export logs {export}")
 
     if testrun.failed:
         raise Exit(message="E2E tests failed", code=testrun.return_code)
@@ -706,7 +712,7 @@ def bumplicense(ctx):
 
     res = run("find . -name '*.go'")
     for file in res.stdout.splitlines():
-        res = run("grep -q License {}".format(file), warn=True)
+        res = run(f"grep -q License {file}", warn=True)
         if not res.ok:
             run(r"sed -i '1s/^/\/\/ SPDX-License-Identifier:Apache-2.0\n\n/' " + file)
  
@@ -716,10 +722,10 @@ def verifylicense(ctx):
     res = run("find . -name '*.go'", hide="out")
     no_license = False
     for file in res.stdout.splitlines():
-        res = run("grep -q License {}".format(file), warn=True)
+        res = run(f"grep -q License {file}", warn=True)
         if not res.ok:
             no_license = True
-            print("{} is missing license".format(file))
+            print(f"{file} is missing license")
     if no_license:
         raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
  
